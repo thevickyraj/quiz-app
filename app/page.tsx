@@ -249,14 +249,19 @@ export default function Page() {
   const progressPercentage = ((current + 1) / questions.length) * 100;
  
   const isMulti = Array.isArray(question.answer);
+  const answeredCount = questions.reduce(
+    (count, _, index) => count + (answers[index] !== undefined ? 1 : 0),
+    0
+  );
  
   return (
  
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+    <div className="min-h-screen bg-slate-50 text-slate-900 p-4 sm:p-6">
  
-      <div className="w-full max-w-2xl">
+      <div className="mx-auto grid w-full max-w-7xl gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
  
-        <div className="mb-8">
+        <main className="min-w-0">
+        <div className="mb-6 rounded-3xl border border-slate-900 bg-white p-7 shadow-sm">
  
           <div className="flex justify-between text-sm text-slate-500 mb-3">
             <span>Question {current + 1} of {questions.length}</span>
@@ -274,7 +279,7 @@ export default function Page() {
  
         </div>
  
-        <div className="bg-white border rounded-3xl p-8">
+        <div className="rounded-3xl border border-slate-900 bg-white p-6 shadow-sm sm:p-8">
  
           <h2 className="text-2xl font-semibold mb-8">
             {question.question}
@@ -298,7 +303,7 @@ export default function Page() {
                   key={idx}
                   onClick={() => handleAnswer(option)}
                   disabled={Boolean(isRevealed)}
-                  className={`w-full text-left p-4 rounded-xl border flex items-center gap-4
+                  className={`w-full text-left text-slate-900 p-4 rounded-xl border flex items-center gap-4
                   ${isWrongSelection ? "border-rose-500 bg-rose-50" : ""}
                   ${isCorrectSelection ? "border-emerald-500 bg-emerald-50" : ""}
                   ${!isRevealed && selected ? "border-indigo-600 bg-indigo-50" : ""}
@@ -376,6 +381,41 @@ export default function Page() {
           </div>
  
         </div>
+        </main>
+
+        <aside className="rounded-3xl border border-slate-900 bg-white p-6 shadow-sm lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)]">
+          <h2 className="text-xl font-bold text-slate-900">Question Dashboard</h2>
+          <p className="mt-2 text-sm text-slate-600">
+            Jump to any question and track answer status.
+          </p>
+
+          <div className="mt-5 flex items-center gap-4 text-xs text-slate-600">
+            <span>{answeredCount} Answered</span>
+            <span>{questions.length - answeredCount} Unanswered</span>
+          </div>
+
+          <div className="mt-4 grid max-h-[calc(100vh-13rem)] grid-cols-2 gap-3 overflow-y-auto pr-1 sm:grid-cols-3 lg:grid-cols-2">
+            {questions.map((_, index) => {
+              const isAnswered = answers[index] !== undefined;
+              const isCurrent = current === index;
+
+              return (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => setCurrent(index)}
+                  className={`rounded-2xl border px-3 py-3 text-left text-sm transition-colors
+                    ${isCurrent ? "border-indigo-600 bg-indigo-50 text-indigo-900" : "border-slate-200 bg-slate-50 text-slate-900 hover:border-indigo-300"}`}
+                >
+                  <span className="block font-medium">Q{index + 1}</span>
+                  <span className={`mt-1 block text-xs font-semibold ${isAnswered ? "text-emerald-600" : "text-amber-600"}`}>
+                    {isAnswered ? "Answered" : "Unanswered"}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </aside>
  
       </div>
  
