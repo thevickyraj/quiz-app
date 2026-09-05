@@ -1,266 +1,384 @@
 "use client";
 import { useState } from "react";
-import { questionBank } from "../data/questions";
+import { questionBank as fallbackQuestions } from "../data/allInOneFinal.js";
 
-function shuffleArray(array) {
-  return [...array].sort(() => Math.random() - 0.5);
-}
+type QuizQuestion = {
+  id?: number;
+  question: string;
+  options: string[];
+  answer: string | string[];
+};
 
-// Inline SVG Icons for a polished look without extra dependencies
+type AnswerValue = string | string[];
+
+const questionBank: QuizQuestion[] = Array.isArray(fallbackQuestions)
+  ? (fallbackQuestions as QuizQuestion[])
+  : [];
+ 
 const CheckIcon = () => (
   <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
   </svg>
 );
-
+ 
 const XIcon = () => (
   <svg className="w-5 h-5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
   </svg>
 );
-
+ 
 export default function Page() {
-  const [questions, setQuestions] = useState([]);
+  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [current, setCurrent] = useState(0);
-  const [answers, setAnswers] = useState({});
+  const [answers, setAnswers] = useState<Record<number, AnswerValue>>({});
+  const [revealed, setRevealed] = useState<Record<number, boolean>>({});
   const [started, setStarted] = useState(false);
   const [finished, setFinished] = useState(false);
-
+ 
   const startQuiz = () => {
-    const selected = shuffleArray(questionBank).slice(0, 60);
-    const shuffled = selected.map((q) => ({
+    if (!Array.isArray(questionBank)) return;
+ 
+    const orderedQuestions = questionBank.map((q) => ({
       ...q,
-      options: shuffleArray(q.options),
+      options: [...(q.options || [])]
     }));
-
-    setQuestions(shuffled);
+ 
+    setQuestions(orderedQuestions);
     setCurrent(0);
     setAnswers({});
+    setRevealed({});
     setStarted(true);
     setFinished(false);
   };
+ 
+  const handleAnswer = (option: string) => {
+    const correct = questions[current]?.answer;
+    const isQuestionMulti = Array.isArray(correct);
 
-  const handleAnswer = (option) => {
-    setAnswers({
-      ...answers,
-      [current]: option,
-    });
+    if (!isQuestionMulti && revealed[current]) return;
+
+    if (Array.isArray(correct)) {
+      const prev = answers[current] ?? [];
+      const prevArray = Array.isArray(prev) ? prev : [prev];
+
+      if (prevArray.includes(option)) {
+        setAnswers({
+          ...answers,
+          [current]: prevArray.filter((o) => o !== option)
+        });
+      } else {
+        setAnswers({
+          ...answers,
+          [current]: [...prevArray, option]
+        });
+      }
+    } else {
+      setAnswers({
+        ...answers,
+        [current]: option
+      });
+      setRevealed({
+        ...revealed,
+        [current]: true
+      });
+    }
   };
-
+ 
   const nextQuestion = () => {
     if (current < questions.length - 1) {
       setCurrent(current + 1);
     }
   };
-
+ 
   const prevQuestion = () => {
     if (current > 0) {
       setCurrent(current - 1);
     }
   };
-
+ 
   const submitQuiz = () => {
     setFinished(true);
   };
-
+ 
   const score = questions.reduce((acc, q, index) => {
-    return answers[index] === q.answer ? acc + 1 : acc;
-  }, 0);
+    const user = answers[index];
+    const correct = q.answer;
 
-  // ===============================
-  // START SCREEN
-  // ===============================
+    if (Array.isArray(correct)) {
+      const userArray = Array.isArray(user) ? user : [];
+
+      if (
+        userArray.length === correct.length &&
+        userArray.every((v) => correct.includes(v))
+      ) {
+        return acc + 1;
+      }
+    } else {
+      if (user === correct) {
+        return acc + 1;
+      }
+    }
+
+    return acc;
+  }, 0);
+ 
   if (!started) {
+ 
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-        <div className="bg-white rounded-3xl shadow-xl shadow-slate-200/50 p-12 text-center w-full max-w-md border border-slate-100 transition-all">
-          <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
-            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-            </svg>
-          </div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-3">
+ 
+        <div className="bg-white rounded-3xl shadow-xl p-12 text-center w-full max-w-md border">
+ 
+          <h1 className="text-3xl font-bold mb-3">
             Knowledge Check
           </h1>
-          <p className="text-slate-500 mb-8 leading-relaxed">
-            Test your skills with our randomized 60-question quiz. Are you ready?
+ 
+          <p className="text-slate-500 mb-8">
+            Test your skills with questions in a fixed order.
           </p>
+ 
           <button
             onClick={startQuiz}
-            className="w-full bg-indigo-600 text-white font-medium py-3.5 rounded-xl hover:bg-indigo-700 hover:shadow-lg hover:shadow-indigo-200 transition-all active:scale-[0.98]"
+            className="w-full bg-indigo-600 text-white py-3 rounded-xl hover:bg-indigo-700"
           >
             Start Quiz
           </button>
+ 
         </div>
+ 
       </div>
     );
   }
-
-  // ===============================
-  // RESULT SCREEN
-  // ===============================
+ 
   if (finished) {
+ 
     const percentage = Math.round((score / questions.length) * 100);
-    
+ 
     return (
+ 
       <div className="min-h-screen bg-slate-50 flex justify-center p-6 py-12">
+ 
         <div className="w-full max-w-3xl">
-          {/* Score Header */}
-          <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-8 text-center mb-8">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400 mb-2">
+ 
+          <div className="bg-white rounded-3xl p-8 text-center mb-8 border">
+ 
+            <h2 className="text-sm uppercase tracking-widest text-slate-400 mb-2">
               Quiz Completed
             </h2>
+ 
             <div className="text-5xl font-extrabold text-slate-900 mb-2">
-              {score} <span className="text-2xl text-slate-400 font-medium">/ {questions.length}</span>
+              {score} / {questions.length}
             </div>
+ 
             <p className={`text-lg font-medium ${percentage >= 70 ? 'text-emerald-500' : 'text-amber-500'}`}>
               You scored {percentage}%
             </p>
+ 
           </div>
-
-          {/* Review Answers */}
+ 
           <div className="space-y-4">
+ 
             {questions.map((q, index) => {
-              const correct = answers[index] === q.answer;
-              const answered = answers[index] !== undefined;
-
+ 
+              const correctAnswer = q.answer;
+              const userAnswer = answers[index];
+ 
+              const correct = Array.isArray(correctAnswer)
+                ? JSON.stringify([...correctAnswer].sort()) === JSON.stringify([...(userAnswer || [])].sort())
+                : userAnswer === correctAnswer;
+ 
               return (
-                <div
-                  key={index}
-                  className={`p-6 rounded-2xl border ${
-                    correct ? "bg-emerald-50/50 border-emerald-100" : "bg-white border-slate-200 shadow-sm"
-                  }`}
-                >
+ 
+                <div key={index} className={`p-6 rounded-2xl border ${correct ? "bg-emerald-50 border-emerald-100" : "bg-white border-slate-200"}`}>
+ 
                   <div className="flex items-start gap-4">
-                    <div className="mt-1 flex-shrink-0">
+ 
+                    <div className="mt-1">
                       {correct ? <CheckIcon /> : <XIcon />}
                     </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-slate-900 mb-3">
-                        <span className="text-slate-400 mr-2">{index + 1}.</span> 
-                        {q.question}
+ 
+                    <div>
+ 
+                      <p className="font-medium mb-3">
+                        {index + 1}. {q.question}
                       </p>
-
-                      <div className="space-y-1.5">
-                        <p className="text-sm flex items-center gap-2">
-                          <span className="text-slate-500 w-24">Your Answer:</span>
-                          <span className={`font-medium ${correct ? "text-emerald-700" : "text-rose-600"}`}>
-                            {answered ? answers[index] : "Skipped"}
+ 
+                      <p className="text-sm">
+                        Your Answer:
+                        <span className={`ml-2 font-medium ${correct ? "text-emerald-700" : "text-rose-600"}`}>
+                          {Array.isArray(userAnswer) ? userAnswer.join(", ") : userAnswer || "Skipped"}
+                        </span>
+                      </p>
+ 
+                      {!correct && (
+                        <p className="text-sm mt-1">
+                          Correct:
+                          <span className="ml-2 font-medium text-emerald-700">
+                            {Array.isArray(correctAnswer) ? correctAnswer.join(", ") : correctAnswer}
                           </span>
                         </p>
-
-                        {!correct && (
-                          <p className="text-sm flex items-center gap-2">
-                            <span className="text-slate-500 w-24">Correct:</span>
-                            <span className="font-medium text-emerald-700">
-                              {q.answer}
-                            </span>
-                          </p>
-                        )}
-                      </div>
+                      )}
+ 
                     </div>
+ 
                   </div>
+ 
                 </div>
+ 
               );
+ 
             })}
+ 
           </div>
-
+ 
           <button
             onClick={startQuiz}
-            className="w-full mt-8 bg-indigo-600 text-white font-medium px-6 py-4 rounded-xl hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 active:scale-[0.99]"
+            className="w-full mt-8 bg-indigo-600 text-white px-6 py-4 rounded-xl hover:bg-indigo-700"
           >
             Retake Quiz
           </button>
+ 
         </div>
+ 
       </div>
     );
   }
-
-  // ===============================
-  // QUIZ SCREEN
-  // ===============================
-  const question = questions[current];
+ 
+  const question = questions[current] || { question: "", options: [] };
+ 
   const progressPercentage = ((current + 1) / questions.length) * 100;
-
+ 
+  const isMulti = Array.isArray(question.answer);
+ 
   return (
+ 
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+ 
       <div className="w-full max-w-2xl">
-        
-        {/* Progress Bar */}
+ 
         <div className="mb-8">
-          <div className="flex justify-between text-sm font-medium text-slate-500 mb-3">
+ 
+          <div className="flex justify-between text-sm text-slate-500 mb-3">
             <span>Question {current + 1} of {questions.length}</span>
             <span>{Math.round(progressPercentage)}%</span>
           </div>
-          <div className="w-full bg-slate-200 rounded-full h-2.5">
+ 
+          <div className="w-full bg-slate-200 rounded-full h-2">
+ 
             <div
-              className="bg-indigo-600 h-2.5 rounded-full transition-all duration-300 ease-out"
+              className="bg-indigo-600 h-2 rounded-full"
               style={{ width: `${progressPercentage}%` }}
-            ></div>
+            />
+ 
           </div>
+ 
         </div>
-
-        {/* Question Card */}
-        <div className="bg-white border border-slate-200 rounded-3xl shadow-sm p-8 md:p-10">
-          <h2 className="text-2xl font-semibold text-slate-900 mb-8 leading-snug">
+ 
+        <div className="bg-white border rounded-3xl p-8">
+ 
+          <h2 className="text-2xl font-semibold mb-8">
             {question.question}
           </h2>
-
+ 
           <div className="space-y-3">
-            {question.options.map((option, idx) => {
-              const selected = answers[current] === option;
-
+ 
+            {(question.options || []).map((option, idx) => {
+ 
+              const selected = isMulti
+                ? (answers[current] || []).includes(option)
+                : answers[current] === option;
+              const isRevealed = revealed[current] && !isMulti;
+              const isCorrectOption = !isMulti && option === question.answer;
+              const isWrongSelection = isRevealed && selected && !isCorrectOption;
+              const isCorrectSelection = isRevealed && isCorrectOption;
+ 
               return (
+ 
                 <button
                   key={idx}
                   onClick={() => handleAnswer(option)}
-                  className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-200 flex items-center gap-4
-                    ${
-                      selected
-                        ? "border-indigo-600 bg-indigo-50/50 text-indigo-900"
-                        : "border-slate-100 hover:border-indigo-200 hover:bg-slate-50 text-slate-700"
-                    }`}
+                  disabled={Boolean(isRevealed)}
+                  className={`w-full text-left p-4 rounded-xl border flex items-center gap-4
+                  ${isWrongSelection ? "border-rose-500 bg-rose-50" : ""}
+                  ${isCorrectSelection ? "border-emerald-500 bg-emerald-50" : ""}
+                  ${!isRevealed && selected ? "border-indigo-600 bg-indigo-50" : ""}
+                  ${!isRevealed ? "border-slate-200 hover:bg-slate-50" : ""}`}
                 >
-                  {/* Custom Radio Button Indicator */}
-                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors
-                    ${selected ? "border-indigo-600" : "border-slate-300"}
-                  `}>
-                    {selected && <div className="w-2.5 h-2.5 rounded-full bg-indigo-600" />}
-                  </div>
-                  <span className="font-medium">{option}</span>
-                </button>
-              );
-            })}
-          </div>
+ 
+                  {isMulti ? (
+ 
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      readOnly
+                      className="w-5 h-5 accent-indigo-600"
+                    />
+ 
+                  ) : (
+ 
+                    <input
+                      type="radio"
+                      checked={selected}
+                      readOnly
+                      className="w-5 h-5 accent-indigo-600"
+                    />
+ 
+                  )}
+ 
+                  <span className="flex-1">{option}</span>
 
-          {/* Navigation */}
-          <div className="flex justify-between items-center mt-10 pt-6 border-t border-slate-100">
+                  {isWrongSelection && (
+                    <span className="font-semibold text-rose-600">Wrong</span>
+                  )}
+
+                  {isCorrectSelection && (
+                    <span className="font-semibold text-emerald-600">Correct</span>
+                  )}
+ 
+                </button>
+ 
+              );
+ 
+            })}
+ 
+          </div>
+ 
+          <div className="flex justify-between mt-10">
+ 
             <button
               onClick={prevQuestion}
               disabled={current === 0}
-              className="px-6 py-2.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition disabled:opacity-40 disabled:cursor-not-allowed"
+              className="px-6 py-2 border rounded-lg disabled:opacity-40"
             >
               Previous
             </button>
-
+ 
             {current === questions.length - 1 ? (
+ 
               <button
                 onClick={submitQuiz}
-                className="px-8 py-2.5 text-sm font-medium bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition active:scale-95"
+                className="px-8 py-2 bg-slate-900 text-white rounded-lg"
               >
                 Submit Quiz
               </button>
+ 
             ) : (
+ 
               <button
                 onClick={nextQuestion}
-                className="px-8 py-2.5 text-sm font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition active:scale-95 shadow-md shadow-indigo-200"
+                className="px-8 py-2 bg-indigo-600 text-white rounded-lg"
               >
                 Next
               </button>
+ 
             )}
+ 
           </div>
+ 
         </div>
+ 
       </div>
+ 
     </div>
   );
 }
